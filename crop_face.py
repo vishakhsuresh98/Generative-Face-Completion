@@ -1,45 +1,66 @@
 import dlib
-import cv2
 from PIL import Image
 from skimage import io
 import matplotlib.pyplot as plt
 
-def detect_faces(image):
-    im = cv2.read(image)
-    (width, height) = im.shape
+
+def detect_face(image):
+    """
+    Detects faces in the input image - uses dlib library
+    :param image: original image
+    :return: detected face in the image
+    """
     # Create a face detector
     face_detector = dlib.get_frontal_face_detector()
 
-    # Run detector and get bounding boxes of the faces on image.
-    detected_faces = face_detector(image, 1)
-    # face_frames = [(x.left(), round(0.4*x.top()),
-    #                x.right(), x.bottom()) for x in detected_faces]
-    face_frames = []
-    relaxation_factor = 0.25
-    for face in detected_faces:
-        relaxed_left = round((1-relaxation_factor)*face.left())
-        relaxed_top = round((1-relaxation_factor)*face.top())
-        relaxed_right = x.right() + round(relaxation_factor*(width-face.right()))
-        relaxed_bottom = x.bottom() + round(relaxation_factor*(height-face.bottom()))
-        face_frames.append((relaxed_left, relaxed_top, relaxed_right, relaxed_bottom))
-    return face_frames
+    # Run detector and get bounding boxes of the face in the image.
+    return face_detector(image, 1)[0]
+
+
+def get_relaxed_boundaries(image, face, factor):
+    """
+    Relaxes (expands) the boundaries by a factor
+    :param image: original image
+    :param face: oetected face
+    :param factor: relaxation factor
+    :return: a 4-tuple with the relaxed boundaries
+    """
+    height, width, depth = image.shape # dimensions of the image
+
+    relaxed_left = round((1 - factor) * face.left())
+    relaxed_top = round((1 - factor) * face.top())
+    relaxed_right = face.right() + round(factor * (width - face.right()))
+    relaxed_bottom = face.bottom() + round(factor * (height - face.bottom()))
+    return (relaxed_left, relaxed_top, relaxed_right, relaxed_bottom)
+
+
+def crop_face(image):
+    """
+    Steps:
+    1. Detect the face in the original image
+    2. Relax the bounding regions
+    3. Crop the image to get exclusively, the face
+    4. Return the cropped image, used in subsequent stages
+    :param image: original image
+    :return: cropped face
+    """
+    detected_face = detect_face(image)
+
+    # Relax the bounding boxes of the image
+    relaxation_factor = .33
+    relaxed_boundaries = get_relaxed_boundaries(image, detected_face, relaxation_factor)
+
+    # Crop the image
+    cropped_face = Image.fromarray(image).crop(relaxed_boundaries)
+    return cropped_face
+
 
 # Load image
-img_path = 'test_pic_01.jpg'
+img_path = 'image.jpeg'
+# img_path = 'test_pic_01.jpg'
+# img_path = 'test_pic_02.jpg'
 image = io.imread(img_path)
 
-# Detect faces
-detected_faces = detect_faces(image)
-
-face = Image.fromarray(image).crop(detected_faces[0])
-
-plt.imshow(face)
+cropped_face = crop_face(image)
+plt.imshow(cropped_face)
 plt.show()
-'''
-# Crop faces and plot
-for n, face_rect in enumerate(detected_faces):
-    face = Image.fromarray(image).crop(face_rect)
-    plt.subplot(1, len(detected_faces), n+1)
-    plt.axis('off')
-    plt.imshow(face)
-'''
